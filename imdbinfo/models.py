@@ -48,7 +48,8 @@ class Person(BaseModel):
 
     @classmethod
     def from_directors(cls, data: dict):
-        data = data['node']
+        if isinstance(data, dict) and "node" in data:
+            data = data["node"]
         return cls(
             name=data["name"]["nameText"]["text"],
             imdb_id=data["name"]["id"].replace("nm", ""),
