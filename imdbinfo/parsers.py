@@ -226,13 +226,16 @@ def _parse_jobs_v2(raw_jobs) -> List[str]:
         jobs.append(job_name)
     return jobs
 
-def _parse_principal_credits_v2(principal_credits_groups) -> List[Person]:
-    for prncipal_credit_group in principal_credits_groups:
-        if prncipal_credit_group.get("grouping", {}).get("text") == "Stars":
-            return [
-                Person.from_cast(a)
-                for a in prncipal_credit_group.get("credits", [])
-            ]
+def _parse_principal_credits_v2_stars(principal_credits_groups) -> List[Person]:
+    if not principal_credits_groups:
+        return []
+    stars: List[Person] = []
+    for group in principal_credits_groups:
+        if group.get("grouping", {}).get("text") == "Stars":
+            for credit in group.get("credits", []):
+                stars.append(Person.from_cast(credit))
+    return stars
+
 
 def _parse_awards(awards_node) -> AwardInfo:
     if awards_node is None:
@@ -349,9 +352,9 @@ def parse_json_movie(raw_json) -> Optional[MovieDetail]:
         raw_json,
         _parse_mpaa,
     )
-    data["stars"] =pjmespatch(         "props.pageProps.mainColumnData.principalCreditsV2",         raw_json,
-        _parse_principal_credits_v2,
-    )
+    data["stars"] =pjmespatch(         "props.pageProps.mainColumnData.principalCreditsV2", raw_json,
+                                       _parse_principal_credits_v2_stars,
+                                       )
     data["directors"] = pjmespatch(
         "props.pageProps.mainColumnData.creditGroupings.edges[].node",
         raw_json,
