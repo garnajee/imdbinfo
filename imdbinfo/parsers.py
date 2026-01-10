@@ -109,6 +109,11 @@ newCreditCategoryIdToOldCategoryIdObject = {
     "amzn1.imdb.concept.name_credit_category.c84ecaff-add5-4f2e-81db-102a41881fe3": "writer",
 }
 
+def flip_unique(d: Dict[Any, Any]) -> Dict[Any, Any]:
+    """Flip a dict when values are unique: value -> key."""
+    return {v: k for k, v in d.items()}
+
+OldCategoryIdToNewCategoryIdObject = flip_unique(newCreditCategoryIdToOldCategoryIdObject)
 
 def pjmespatch(query, data, post_process=None, *args, **kwargs):
     result = jmespath.search(query, data)
@@ -122,7 +127,7 @@ def _parse_directors(result):
     return [
         Person.from_directors(edge)
         for group in result
-        if group.get("grouping", {}).get("text") in [ "Directors" , "Director" ]
+        if group.get("grouping", {}).get("groupingId") in [ OldCategoryIdToNewCategoryIdObject["director"] ]
         for edge in group.get("credits", {}).get("edges", [])
     ]
 

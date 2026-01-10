@@ -157,3 +157,6 @@
 ## v0.6.6
 - Fix bug in directors parsing due to imdb data structure change
 
+## v0.6.7
+- Fix bug in directors parsing: handle locales in Directors Parsing, using objectId instead of Label name
+
