@@ -44,6 +44,8 @@ from .models import (
     CompanyInfo,
     AkasData,
     AwardInfo,
+    WatchProvider,
+    WatchProviders,
 )
 from .transformers import (
     _release_date,
@@ -777,3 +779,103 @@ def parse_json_filmography(raw_json) -> Dict[str, List[MovieBriefInfo]]:
             MovieBriefInfo.from_filmography(pjmespatch("title", edge))
         )
     return credits_by_job
+
+
+# --- Watch Providers ---
+
+PROVIDER_NAMES = {
+    "pvt_aiv": "Prime Video",
+    "pvc_ocsfr": "OCS",
+    "hbomax": "HBO Max",
+    "max": "Max",
+    "amazon": "Amazon",
+    "netflix": "Netflix",
+    "disneyplus": "Disney+",
+    "appletv": "Apple TV+",
+    "paramountplus": "Paramount+",
+    "canalplus": "Canal+",
+    "crunchyroll": "Crunchyroll",
+    "mubi": "MUBI",
+    "ocs": "OCS",
+}
+
+
+def _clean_provider_name(ref_tag: str, title_value: str) -> str:
+    """Get a clean provider name from refTagFragment or title."""
+    if ref_tag in PROVIDER_NAMES:
+        return PROVIDER_NAMES[ref_tag]
+    # Strip common prefixes from the title value
+    for prefix in ("Watch on ", "Search on "):
+        if title_value.startswith(prefix):
+            return title_value[len(prefix):]
+    return title_value
+
+
+def parse_watch_providers(raw_json: dict, imdb_id: str) -> WatchProviders:
+    """Parse watch providers from the HERO_WATCH_BOX GraphQL response."""
+    logger.debug("Parsing watch providers for %s", imdb_id)
+
+    streaming = []
+    rent_buy = []
+
+    title_data = raw_json.get("data", {}).get("title", {})
+    if not title_data:
+        logger.warning("No title data found in watch providers response for %s", imdb_id)
+        return WatchProviders(imdbId=f"tt{imdb_id}", streaming=[], rent_buy=[])
+
+    categories_data = (
+        title_data
+        .get("watchOptionsByCategory", {})
+        .get("categorizedWatchOptionsList", [])
+    )
+
+    CATEGORY_MAP = {
+        "STREAMING": "streaming",
+        "RENT/BUY": "rent_buy",
+    }
+
+    for cat in categories_data:
+        cat_name_raw = cat.get("categoryName", {}).get("value", "")
+        cat_key = CATEGORY_MAP.get(cat_name_raw, cat_name_raw.lower().replace("/", "_"))
+
+        for option in cat.get("watchOptions", []):
+            provider_data = option.get("provider", {})
+            ref_tag = provider_data.get("refTagFragment", "")
+            provider_id = provider_data.get("id", "")
+            title_value = option.get("title", {}).get("value", "")
+            link = option.get("link", "")
+
+            # Description (e.g. "with Prime Video Channels", "from €2.99")
+            short_desc = option.get("shortDescription")
+            if short_desc and isinstance(short_desc, dict):
+                short_desc = short_desc.get("value")
+            description = option.get("description")
+            if description and isinstance(description, dict):
+                description = description.get("value")
+            # Use description if available, otherwise shortDescription
+            final_desc = description or short_desc or None
+
+            name = _clean_provider_name(ref_tag, title_value)
+
+            wp = WatchProvider(
+                provider_id=provider_id,
+                name=name,
+                link=link,
+                category=cat_key,
+                description=final_desc,
+            )
+
+            if cat_key == "streaming":
+                streaming.append(wp)
+            else:
+                rent_buy.append(wp)
+
+    logger.info(
+        "Parsed %d streaming and %d rent/buy providers for %s",
+        len(streaming), len(rent_buy), imdb_id,
+    )
+    return WatchProviders(
+        imdbId=f"tt{imdb_id}",
+        streaming=streaming,
+        rent_buy=rent_buy,
+    )

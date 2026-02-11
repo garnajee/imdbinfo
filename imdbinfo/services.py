@@ -36,6 +36,7 @@ from .models import (
     SeasonEpisodesList,
     PersonDetail,
     AkasData,
+    WatchProviders,
 )
 from .parsers import (
     parse_json_movie,
@@ -47,6 +48,7 @@ from .parsers import (
     parse_json_trivia,
     parse_json_reviews,
     parse_json_filmography,
+    parse_watch_providers,
 )
 from .locale import _retrieve_url_lang
 
@@ -516,3 +518,85 @@ def _get_extended_name_info(person_id) -> dict:
     data = request_graphql_url(headers, person_id, payload, url)
     raw_json = data.get("data", {}).get("name", {})
     return raw_json
+
+
+def get_watch_providers(
+    imdb_id: str,
+    locale: Optional[str] = "fr-FR",
+    location: Optional[Dict[str, str]] = None,
+) -> WatchProviders:
+    """
+    Fetch watch/streaming providers for a title using IMDb's GraphQL API.
+
+    Returns a WatchProviders object with streaming and rent/buy lists.
+
+    :param imdb_id: IMDb ID (with or without 'tt' prefix)
+    :param locale: Locale string (e.g. 'fr-FR', 'en-US'). Defaults to 'fr-FR'.
+    :param location: Optional dict with 'lat' and 'long' keys. Defaults to Paris (48.87, 2.33).
+    """
+    from datetime import date
+
+    imdb_id, _ = normalize_imdb_id(imdb_id)
+    imdbId = f"tt{imdb_id}"
+
+    if location is None:
+        location = {"lat": "48.87", "long": "2.33"}
+
+    today = date.today()
+    yesterday = date.fromordinal(today.toordinal() - 1)
+
+    # Extract country from locale (e.g. 'fr-FR' -> 'FR')
+    country = locale.split("-")[-1] if "-" in locale else "FR"
+
+    variables = json.dumps({
+        "heroNowDateDay": today.day,
+        "heroNowDateMonth": today.month,
+        "heroNowDateYear": today.year,
+        "heroYesterdayDateDay": yesterday.day,
+        "heroYesterdayDateMonth": yesterday.month,
+        "heroYesterdayDateYear": yesterday.year,
+        "id": imdbId,
+        "includeUserPreferredServices": False,
+        "locale": locale,
+        "location": {"latLong": {"lat": location["lat"], "long": location["long"]}},
+    }, separators=(",", ":"))
+
+    params = {
+        "operationName": "HERO_WATCH_BOX",
+        "variables": variables,
+        "extensions": json.dumps({
+            "persistedQuery": {
+                "sha256Hash": "45a4e574562d71de9f5c7efe76d5e47a08f06457c6a69749802218db5162f3d6",
+                "version": 1,
+            }
+        }, separators=(",", ":")),
+    }
+
+    headers = {
+        "User-Agent": random.choice(USER_AGENTS_LIST),
+        "Accept": "application/graphql+json, application/json",
+        "content-type": "application/json",
+        "x-imdb-client-name": "imdb-web-next-localized",
+        "x-imdb-user-language": locale,
+        "x-imdb-user-country": country,
+    }
+
+    logger.info("Fetching watch providers for %s (locale=%s)", imdbId, locale)
+    resp = niquests.get(
+        "https://api.graphql.imdb.com/",
+        params=params,
+        headers=headers,
+    )
+    if resp.status_code != 200:
+        logger.error("Watch providers request failed: %s", resp.status_code)
+        error_msg = f"Watch providers request failed for {imdbId}: HTTP {resp.status_code}"
+        if resp.text:
+            error_msg += f" - {resp.text[:200]}"
+        raise Exception(error_msg)
+
+    raw_json = resp.json()
+    if "errors" in raw_json:
+        logger.error("GraphQL error for watch providers: %s", raw_json["errors"])
+        raise Exception(f"GraphQL error for watch providers {imdbId}: {raw_json['errors']}")
+
+    return parse_watch_providers(raw_json, imdb_id)

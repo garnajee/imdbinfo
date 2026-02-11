@@ -33,6 +33,7 @@ from .services import (
     get_trivia,
     get_filmography,
     get_all_interests,
+    get_watch_providers,
     TitleType,
 )
 
@@ -48,6 +49,7 @@ __all__ = [
     "get_trivia",
     "get_filmography",
     "get_all_interests",
+    "get_watch_providers",
     "TitleType",
 ]
 

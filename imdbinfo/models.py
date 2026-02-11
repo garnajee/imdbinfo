@@ -240,6 +240,37 @@ class AwardInfo(BaseModel):
         return ", ".join(parts) if parts else "No awards information"
 
 
+class WatchProvider(BaseModel):
+    """Model representing a single watch provider (streaming or rent/buy).
+    Contains the provider name, link, id, category (streaming or rent_buy),
+    and an optional description (e.g. 'with Prime Video Channels').
+    """
+
+    provider_id: str  # e.g. "amzn1.imdb.w2w.provider.prime_video.ocsfr"
+    name: str  # e.g. "OCS" (cleaned from refTagFragment or title)
+    link: str  # e.g. "https://www.primevideo.com/detail/..."
+    category: str  # "streaming" or "rent_buy"
+    description: Optional[str] = None  # e.g. "with Prime Video Channels"
+
+    def __str__(self):
+        desc = f" ({self.description})" if self.description else ""
+        return f"{self.name} [{self.category}]{desc}"
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self.name} - {self.category})"
+
+
+class WatchProviders(BaseModel):
+    """Model grouping watch providers for a title into streaming and rent/buy categories."""
+
+    imdbId: str
+    streaming: List[WatchProvider] = Field(default_factory=list)
+    rent_buy: List[WatchProvider] = Field(default_factory=list)
+
+    def __str__(self):
+        return f"WatchProviders({self.imdbId}: {len(self.streaming)} streaming, {len(self.rent_buy)} rent/buy)"
+
+
 class MovieDetail(SeriesMixin, BaseModel):
     """MovieDetail model for detailed information about a movie.
     This model contains all the information about a movie such as title, id, imdb_id, imdbId, url, cover_url, plot, release_date, languages, certificates, directors, stars,
