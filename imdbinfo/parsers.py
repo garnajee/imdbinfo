@@ -785,18 +785,14 @@ def parse_json_filmography(raw_json) -> Dict[str, List[MovieBriefInfo]]:
 
 PROVIDER_NAMES = {
     "pvt_aiv": "Prime Video",
+    "pvs_piv": "Prime Video",
     "pvc_ocsfr": "OCS",
     "hbomax": "HBO Max",
-    "max": "Max",
-    "amazon": "Amazon",
     "netflix": "Netflix",
     "disneyplus": "Disney+",
     "appletv": "Apple TV+",
-    "paramountplus": "Paramount+",
-    "canalplus": "Canal+",
+    "paramount+": "Paramount+",
     "crunchyroll": "Crunchyroll",
-    "mubi": "MUBI",
-    "ocs": "OCS",
 }
 
 
